@@ -36,38 +36,39 @@ class JobsList:
         current_status = HostStatus(
             host=host_id,
             time=datetime.now(),
-            jobs=len(self.jobs[host_id])
+            jobs=len(self.jobs_per_host[host_id])
         )
         current_status.save()
 
     def insert_local_job(self, job_id, host_id):
-        if host_id not in self.jobs.keys():
-            self.jobs[host_id] = []
-        self.jobs[host_id].append(job_id)
+        if host_id not in self.jobs_per_host.keys():
+            self.jobs_per_host[host_id] = []
+        self.jobs_per_host[host_id].append(job_id)
         self.host_per_job[job_id] = host_id
-        self.update_elastic()
+        self.update_elastic(host_id)
 
     def insert_remote_job(self, job_id, host_id):
-        if host_id not in self.jobs.keys():
-            self.jobs[host_id] = []
-        self.jobs[host_id].append(job_id)
+        if host_id not in self.jobs_per_host.keys():
+            self.jobs_per_host[host_id] = []
+        self.jobs_per_host[host_id].append(job_id)
         self.host_per_job[job_id] = host_id
-        self.update_elastic()
+        self.update_elastic(host_id)
 
     def remove_local_job(self, job_id):
         if job_id in self.host_per_job.keys():
             host_id = self.host_per_job[job_id]
-            self.jobs[host_id].remove(job_id)
-        self.update_elastic()
+            self.jobs_per_host[host_id].remove(job_id)
+            self.update_elastic(host_id)
 
     def remove_remote_job(self, job_id):
         if job_id in self.host_per_job.keys():
             host_id = self.host_per_job[job_id]
-            self.jobs[host_id].remove(job_id)
-        self.update_elastic()
+            self.jobs_per_host[host_id].remove(job_id)
+            self.update_elastic(host_id)
 
 
 def local_created_on_created(event):
+    print("Local job created")
     job_id, host_id = event.src_path.split('|')[1], event.src_path.split('|')[2]
     jobs_list = JobsList()
     jobs_list.insert_local_job(job_id, host_id)
@@ -75,6 +76,7 @@ def local_created_on_created(event):
 
 
 def local_done_on_created(event):
+    print("Local job done")
     job_id = event.src_path.split('|')[1]
     jobs_list = JobsList()
     jobs_list.remove_local_job(job_id)
@@ -82,6 +84,7 @@ def local_done_on_created(event):
 
 
 def remote_created_on_created(event):
+    print("Remote job created")
     job_id, host_id = event.src_path.split('|')[1], event.src_path.split('|')[2]
     jobs_list = JobsList()
     jobs_list.insert_local_job(job_id, host_id)
@@ -89,6 +92,7 @@ def remote_created_on_created(event):
 
 
 def remote_done_on_created(event):
+    print("Remote job done")
     job_id = event.src_path.split('|')[1]
     jobs_list = JobsList()
     jobs_list.remove_remote_job(job_id)
