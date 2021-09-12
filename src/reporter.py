@@ -25,8 +25,11 @@ class JobsList:
     def __init__(self):
         self.jobs_per_host = {}
         self.host_per_job = {}
+        self.known_hosts = []
 
     def update_elastic(self, host_id):
+        if host_id not in self.jobs_per_host:
+            self.jobs_per_host[host_id] = 0
         connections.create_connection(hosts=ELASTIC_ADDRESS)
         current_status = HostStatus(
             host=host_id,
@@ -36,7 +39,7 @@ class JobsList:
         current_status.save()
 
     def update_all(self):
-        tmp_hosts = list(self.jobs_per_host.keys())
+        tmp_hosts = self.known_hosts.copy()
         for host in tmp_hosts:
             self.update_elastic(host)
 
@@ -48,6 +51,7 @@ class JobsList:
     def insert_job(self, job_id, host_id):
         if host_id not in self.jobs_per_host.keys():
             self.jobs_per_host[host_id] = 0
+            self.known_hosts += [host_id]
         self.jobs_per_host[host_id] += 1
         self.host_per_job[job_id] = host_id
 
@@ -57,17 +61,17 @@ class JobsList:
             self.jobs_per_host[host_id] = max(self.jobs_per_host[host_id] - 1, 0)
 
 
-def job_begin(event, jobs_list):
+def job_begin(filename, jobs_list):
     print("job created")
-    os.remove(event)
-    job_id, host_id = event.split('|')[1], event.split('|')[2]
+    os.remove(filename)
+    job_id, host_id = filename.split('|')[1], filename.split('|')[2]
     jobs_list.insert_job(job_id, host_id)
 
 
-def job_done(event, jobs_list):
+def job_done(filename, jobs_list):
     print("job done")
-    os.remove(event)
-    job_id = event.split('|')[1]
+    os.remove(filename)
+    job_id = filename.split('|')[1]
     jobs_list.remove_job(job_id)
 
 
@@ -79,7 +83,6 @@ def main():
     try:
         while True:
             time.sleep(10)
-            jobs_list = JobsList()
             begin_logs = list(filter(os.path.isfile, glob.glob(path + "BEGIN*")))
             begin_logs.sort(key=lambda x: os.path.getmtime(x))
             for log in begin_logs:
