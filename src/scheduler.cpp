@@ -20,7 +20,6 @@
 #include <memory>
 #include <iostream>
 #include <fstream>
-#include <ctime>
 
 #include <glib.h>
 #include <glib-unix.h>
@@ -129,36 +128,43 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
         return false;
 
     ofstream journal_file;
+    std::string journal_file_dir;
+    std::string journal_file_name;
+    journal_file_dir = ".logs/";
     switch (msg->type) {
     case M_MON_LOCAL_JOB_BEGIN: {
         auto *m = dynamic_cast<MonLocalJobBeginMsg*>(msg.get());
         Job::createLocal(m->job_id, m->hostid, m->file);
-        journal_file.open("example.txt", std::ios_base::app);
-        journal_file << "LOCAL_JOB_BEGIN | " << std::time(nullptr) << " | " << m->job_id << " | " << m->hostid << "\n";
+        journal_file_name = journal_file_dir + "LOCAL_JOB_BEGIN|" + std::to_string(m->job_id) + "|" + std::to_string(m->hostid);
+        journal_file.open(journal_file_name);
+        journal_file << "";
         journal_file.close();
         break;
     }
     case M_JOB_LOCAL_DONE: {
         auto *m = dynamic_cast<JobLocalDoneMsg*>(msg.get());
         Job::remove(m->job_id);
-        journal_file.open("example.txt", std::ios_base::app);
-        journal_file << "LOCAL_JOB_DONE | " << std::time(nullptr) << " | " << m->job_id << "\n";
+        journal_file_name = journal_file_dir + "LOCAL_JOB_DONE|" + std::to_string(m->job_id);
+        journal_file.open(journal_file_name);
+        journal_file << "";
         journal_file.close();
         break;
     }
     case M_MON_JOB_BEGIN: {
         auto *m = dynamic_cast<MonJobBeginMsg*>(msg.get());
         Job::createRemote(m->job_id, m->hostid);
-        journal_file.open("example.txt", std::ios_base::app);
-        journal_file << "JOB_BEGIN | " << std::time(nullptr) << " | " << m->job_id << " | " << m->hostid << "\n";
+        journal_file_name = journal_file_dir + "JOB_BEGIN|" + std::to_string(m->job_id) + "|" + std::to_string(m->hostid);
+        journal_file.open(journal_file_name);
+        journal_file << "";
         journal_file.close();
         break;
     }
     case M_MON_JOB_DONE: {
         auto *m = dynamic_cast<MonJobDoneMsg*>(msg.get());
         Job::remove(m->job_id);
-        journal_file.open("example.txt", std::ios_base::app);
-        journal_file << "JOB_DONE | " << std::time(nullptr) << " | " << m->job_id << "\n";
+        journal_file_dir = journal_file_dir + "JOB_DONE|" + std::to_string(m->job_id);
+        journal_file.open(journal_file_name);
+        journal_file << "";
         journal_file.close();
         break;
     }
