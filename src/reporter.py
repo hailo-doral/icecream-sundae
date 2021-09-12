@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 from datetime import datetime
 
 from watchdog.events import PatternMatchingEventHandler
@@ -28,7 +29,9 @@ class JobsList:
         if not hasattr(cls, 'instance'):
             cls.instance = super(JobsList, cls).__new__(cls)
             cls.instance.jobs_per_host = {}
+            cls.instance.jobs_lock = threading.Lock()
             cls.instance.host_per_job = {}
+            cls.instance.host_lock = threading.Lock()
         return cls.instance
 
     def update_elastic(self, host_id):
@@ -40,63 +43,76 @@ class JobsList:
         )
         current_status.save()
 
+    def update_all(self):
+        tmp_hosts = self.jobs_per_host.keys().copy()
+        for host in tmp_hosts:
+            self.update_elastic(host)
+
     def insert_local_job(self, job_id, host_id):
+        self.jobs_lock.acquire()
         if host_id not in self.jobs_per_host.keys():
             self.jobs_per_host[host_id] = []
         self.jobs_per_host[host_id].append(job_id)
+        self.jobs_lock.release()
+        self.host_lock.acquire()
         self.host_per_job[job_id] = host_id
-        self.update_elastic(host_id)
+        self.host_lock.release()
 
     def insert_remote_job(self, job_id, host_id):
+        self.jobs_lock.acquire()
         if host_id not in self.jobs_per_host.keys():
             self.jobs_per_host[host_id] = []
         self.jobs_per_host[host_id].append(job_id)
+        self.jobs_lock.release()
+        self.host_lock.acquire()
         self.host_per_job[job_id] = host_id
-        self.update_elastic(host_id)
+        self.host_lock.release()
 
     def remove_local_job(self, job_id):
         if job_id in self.host_per_job.keys():
             host_id = self.host_per_job[job_id]
+            self.jobs_lock.acquire()
             self.jobs_per_host[host_id].remove(job_id)
-            self.update_elastic(host_id)
+            self.jobs_lock.release()
 
     def remove_remote_job(self, job_id):
         if job_id in self.host_per_job.keys():
             host_id = self.host_per_job[job_id]
+            self.jobs_lock.acquire()
             self.jobs_per_host[host_id].remove(job_id)
-            self.update_elastic(host_id)
+            self.jobs_lock.release()
 
 
 def local_created_on_created(event):
     print("Local job created")
+    os.remove(event.src_path)
     job_id, host_id = event.src_path.split('|')[1], event.src_path.split('|')[2]
     jobs_list = JobsList()
     jobs_list.insert_local_job(job_id, host_id)
-    os.remove(event.src_path)
 
 
 def local_done_on_created(event):
     print("Local job done")
+    os.remove(event.src_path)
     job_id = event.src_path.split('|')[1]
     jobs_list = JobsList()
     jobs_list.remove_local_job(job_id)
-    os.remove(event.src_path)
 
 
 def remote_created_on_created(event):
     print("Remote job created")
+    os.remove(event.src_path)
     job_id, host_id = event.src_path.split('|')[1], event.src_path.split('|')[2]
     jobs_list = JobsList()
     jobs_list.insert_local_job(job_id, host_id)
-    os.remove(event.src_path)
 
 
 def remote_done_on_created(event):
     print("Remote job done")
+    os.remove(event.src_path)
     job_id = event.src_path.split('|')[1]
     jobs_list = JobsList()
     jobs_list.remove_remote_job(job_id)
-    os.remove(event.src_path)
 
 
 def main():
@@ -135,7 +151,9 @@ def main():
 
     try:
         while True:
-            time.sleep(0.1)
+            time.sleep(1)
+            jobs_list = JobsList()
+            jobs_list.update_all()
     except KeyboardInterrupt:
         local_created_observer.stop()
         local_done_observer.stop()
