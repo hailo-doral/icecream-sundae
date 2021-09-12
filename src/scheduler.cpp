@@ -135,7 +135,7 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
     case M_MON_LOCAL_JOB_BEGIN: {
         auto *m = dynamic_cast<MonLocalJobBeginMsg*>(msg.get());
         Job::createLocal(m->job_id, m->hostid, m->file);
-        journal_file_name = journal_file_dir + "LOCAL_JOB_BEGIN|" + std::to_string(m->job_id) + "|" + std::to_string(m->hostid);
+        journal_file_name = journal_file_dir + "BEGIN|" + std::to_string(m->job_id) + "|" + std::to_string(m->hostid);
         journal_file.open(journal_file_name);
         journal_file << "";
         journal_file.close();
@@ -144,7 +144,7 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
     case M_JOB_LOCAL_DONE: {
         auto *m = dynamic_cast<JobLocalDoneMsg*>(msg.get());
         Job::remove(m->job_id);
-        journal_file_name = journal_file_dir + "LOCAL_JOB_DONE|" + std::to_string(m->job_id);
+        journal_file_name = journal_file_dir + "DONE|" + std::to_string(m->job_id);
         journal_file.open(journal_file_name);
         journal_file << "";
         journal_file.close();
@@ -153,7 +153,7 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
     case M_MON_JOB_BEGIN: {
         auto *m = dynamic_cast<MonJobBeginMsg*>(msg.get());
         Job::createRemote(m->job_id, m->hostid);
-        journal_file_name = journal_file_dir + "JOB_BEGIN|" + std::to_string(m->job_id) + "|" + std::to_string(m->hostid);
+        journal_file_name = journal_file_dir + "BEGIN|" + std::to_string(m->job_id) + "|" + std::to_string(m->hostid);
         journal_file.open(journal_file_name);
         journal_file << "";
         journal_file.close();
@@ -162,7 +162,7 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
     case M_MON_JOB_DONE: {
         auto *m = dynamic_cast<MonJobDoneMsg*>(msg.get());
         Job::remove(m->job_id);
-        journal_file_dir = journal_file_dir + "JOB_DONE|" + std::to_string(m->job_id);
+        journal_file_dir = journal_file_dir + "DONE|" + std::to_string(m->job_id);
         journal_file.open(journal_file_name);
         journal_file << "";
         journal_file.close();

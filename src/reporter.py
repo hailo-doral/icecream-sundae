@@ -1,10 +1,7 @@
 import os
+import glob
 import time
-import threading
 from datetime import datetime
-
-from watchdog.events import PatternMatchingEventHandler
-from watchdog.observers import Observer
 
 from elasticsearch_dsl import Document, Keyword, Date, Integer
 from elasticsearch_dsl.connections import connections
@@ -29,9 +26,7 @@ class JobsList:
         if not hasattr(cls, 'instance'):
             cls.instance = super(JobsList, cls).__new__(cls)
             cls.instance.jobs_per_host = {}
-            cls.instance.jobs_lock = threading.Lock()
             cls.instance.host_per_job = {}
-            cls.instance.host_lock = threading.Lock()
         return cls.instance
 
     def update_elastic(self, host_id):
@@ -39,130 +34,69 @@ class JobsList:
         current_status = HostStatus(
             host=host_id,
             time=datetime.now(),
-            jobs=len(self.jobs_per_host[host_id])
+            jobs=self.jobs_per_host[host_id]
         )
         current_status.save()
 
     def update_all(self):
-        tmp_hosts = self.jobs_per_host.keys().copy()
+        tmp_hosts = list(self.jobs_per_host.keys())
         for host in tmp_hosts:
             self.update_elastic(host)
 
-    def insert_local_job(self, job_id, host_id):
-        self.jobs_lock.acquire()
+    def print_status(self):
+        tmp_status = self.jobs_per_host.copy()
+        for host in tmp_status:
+            print(f'{host}: {tmp_status[host]}')
+
+    def insert_job(self, job_id, host_id):
         if host_id not in self.jobs_per_host.keys():
-            self.jobs_per_host[host_id] = []
-        self.jobs_per_host[host_id].append(job_id)
-        self.jobs_lock.release()
-        self.host_lock.acquire()
+            self.jobs_per_host[host_id] = 0
+        self.jobs_per_host[host_id] += 1
         self.host_per_job[job_id] = host_id
-        self.host_lock.release()
 
-    def insert_remote_job(self, job_id, host_id):
-        self.jobs_lock.acquire()
-        if host_id not in self.jobs_per_host.keys():
-            self.jobs_per_host[host_id] = []
-        self.jobs_per_host[host_id].append(job_id)
-        self.jobs_lock.release()
-        self.host_lock.acquire()
-        self.host_per_job[job_id] = host_id
-        self.host_lock.release()
-
-    def remove_local_job(self, job_id):
+    def remove_job(self, job_id):
         if job_id in self.host_per_job.keys():
-            host_id = self.host_per_job[job_id]
-            self.jobs_lock.acquire()
-            self.jobs_per_host[host_id].remove(job_id)
-            self.jobs_lock.release()
-
-    def remove_remote_job(self, job_id):
-        if job_id in self.host_per_job.keys():
-            host_id = self.host_per_job[job_id]
-            self.jobs_lock.acquire()
-            self.jobs_per_host[host_id].remove(job_id)
-            self.jobs_lock.release()
+            host_id = self.host_per_job.pop(job_id)
+            self.jobs_per_host[host_id] = max(self.jobs_per_host[host_id] - 1, 0)
 
 
-def local_created_on_created(event):
-    print("Local job created")
-    os.remove(event.src_path)
-    job_id, host_id = event.src_path.split('|')[1], event.src_path.split('|')[2]
+def job_begin(event):
+    print("job created")
+    os.remove(event)
+    job_id, host_id = event.split('|')[1], event.split('|')[2]
     jobs_list = JobsList()
-    jobs_list.insert_local_job(job_id, host_id)
+    jobs_list.insert_job(job_id, host_id)
 
 
-def local_done_on_created(event):
-    print("Local job done")
-    os.remove(event.src_path)
-    job_id = event.src_path.split('|')[1]
+def job_done(event):
+    print("job done")
+    os.remove(event)
+    job_id = event.split('|')[1]
     jobs_list = JobsList()
-    jobs_list.remove_local_job(job_id)
-
-
-def remote_created_on_created(event):
-    print("Remote job created")
-    os.remove(event.src_path)
-    job_id, host_id = event.src_path.split('|')[1], event.src_path.split('|')[2]
-    jobs_list = JobsList()
-    jobs_list.insert_local_job(job_id, host_id)
-
-
-def remote_done_on_created(event):
-    print("Remote job done")
-    os.remove(event.src_path)
-    job_id = event.src_path.split('|')[1]
-    jobs_list = JobsList()
-    jobs_list.remove_remote_job(job_id)
+    jobs_list.remove_job(job_id)
 
 
 def main():
-    # Create handler with patterns
-    local_created_handler = PatternMatchingEventHandler(['LOCAL_JOB_BEGIN|*'])
-    local_done_handler = PatternMatchingEventHandler(['LOCAL_JOB_DONE|*'])
-    remote_created_handler = PatternMatchingEventHandler(['JOB_BEGIN|*'])
-    remote_done_handler = PatternMatchingEventHandler(['JOB_DONE|*'])
-
-    # Define on_created behaviors
-    local_created_handler.on_created = local_created_on_created
-    local_done_handler.on_created = local_done_on_created
-    remote_created_handler.on_created = remote_created_on_created
-    remote_done_handler.on_created = remote_done_on_created
-
-    # Create observers
     path = "../builddir/.logs/"
     if not os.path.isdir(path):
         os.mkdir(path)
-    local_created_observer = Observer()
-    local_done_observer = Observer()
-    remote_created_observer = Observer()
-    remote_done_observer = Observer()
-
-    # Schedule observers
-    local_created_observer.schedule(local_created_handler, path)
-    local_done_observer.schedule(local_done_handler, path)
-    remote_created_observer.schedule(remote_created_handler, path)
-    remote_done_observer.schedule(remote_done_handler, path)
-
-    # Start observers
-    local_created_observer.start()
-    local_done_observer.start()
-    remote_created_observer.start()
-    remote_done_observer.start()
 
     try:
         while True:
-            time.sleep(1)
+            time.sleep(10)
             jobs_list = JobsList()
-            jobs_list.update_all()
+            begin_logs = list(filter(os.path.isfile, glob.glob(path + "BEGIN*")))
+            begin_logs.sort(key=lambda x: os.path.getmtime(x))
+            for log in begin_logs:
+                job_begin(log)
+            end_logs = list(filter(os.path.isfile, glob.glob(path + "DONE*")))
+            end_logs.sort(key=lambda x: os.path.getmtime(x))
+            for log in end_logs:
+                job_done(log)
+            # jobs_list.update_all()
+            jobs_list.print_status()
     except KeyboardInterrupt:
-        local_created_observer.stop()
-        local_done_observer.stop()
-        remote_created_observer.stop()
-        remote_done_observer.stop()
-        local_created_observer.join()
-        local_done_observer.join()
-        remote_created_observer.join()
-        remote_done_observer.join()
+        pass
 
 
 if __name__ == "__main__":
