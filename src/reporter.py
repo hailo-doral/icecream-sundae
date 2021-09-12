@@ -22,12 +22,9 @@ class HostStatus(Document):
 
 
 class JobsList:
-    def __new__(cls):
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(JobsList, cls).__new__(cls)
-            cls.instance.jobs_per_host = {}
-            cls.instance.host_per_job = {}
-        return cls.instance
+    def __init__(self):
+        self.jobs_per_host = {}
+        self.host_per_job = {}
 
     def update_elastic(self, host_id):
         connections.create_connection(hosts=ELASTIC_ADDRESS)
@@ -60,19 +57,17 @@ class JobsList:
             self.jobs_per_host[host_id] = max(self.jobs_per_host[host_id] - 1, 0)
 
 
-def job_begin(event):
+def job_begin(event, jobs_list):
     print("job created")
     os.remove(event)
     job_id, host_id = event.split('|')[1], event.split('|')[2]
-    jobs_list = JobsList()
     jobs_list.insert_job(job_id, host_id)
 
 
-def job_done(event):
+def job_done(event, jobs_list):
     print("job done")
     os.remove(event)
     job_id = event.split('|')[1]
-    jobs_list = JobsList()
     jobs_list.remove_job(job_id)
 
 
@@ -80,7 +75,7 @@ def main():
     path = "../builddir/.logs/"
     if not os.path.isdir(path):
         os.mkdir(path)
-
+    jobs_list = JobsList()
     try:
         while True:
             time.sleep(10)
@@ -88,12 +83,12 @@ def main():
             begin_logs = list(filter(os.path.isfile, glob.glob(path + "BEGIN*")))
             begin_logs.sort(key=lambda x: os.path.getmtime(x))
             for log in begin_logs:
-                job_begin(log)
+                job_begin(log, jobs_list)
             end_logs = list(filter(os.path.isfile, glob.glob(path + "DONE*")))
             end_logs.sort(key=lambda x: os.path.getmtime(x))
             for log in end_logs:
-                job_done(log)
-            # jobs_list.update_all()
+                job_done(log, jobs_list)
+            jobs_list.update_all()
             jobs_list.print_status()
     except KeyboardInterrupt:
         pass
