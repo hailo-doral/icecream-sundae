@@ -109,7 +109,9 @@ def main():
     remote_done_handler.on_created = remote_done_on_created
 
     # Create observers
-    path = "../builddir/"
+    path = "../builddir/.logs/"
+    if not os.path.isdir(path):
+        os.mkdir(path)
     local_created_observer = Observer()
     local_done_observer = Observer()
     remote_created_observer = Observer()
