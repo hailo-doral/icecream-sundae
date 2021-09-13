@@ -136,54 +136,56 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
         auto *m = dynamic_cast<MonLocalJobBeginMsg*>(msg.get());
         Job::createLocal(m->job_id, m->hostid, m->file);
         auto host = Host::find(m->hostid);
-        journal_file_name = journal_file_dir + "BEGIN%" + std::to_string(m->job_id) + "%" + host->getName() + ".txt";
-        journal_file.open(journal_file_name);
-        if (!journal_file) {
+        if (!host) {
             exit(1);
         }
-        journal_file << "\n";
+        journal_file_name = journal_file_dir + host->getName() + ".txt";
+        journal_file.open(journal_file_name);
+        journal_file << host->getCurrentJobs().size();
         journal_file.flush();
         journal_file.close();
         break;
     }
     case M_JOB_LOCAL_DONE: {
         auto *m = dynamic_cast<JobLocalDoneMsg*>(msg.get());
-        journal_file_name = journal_file_dir + "DONE%" + std::to_string(m->job_id) + ".txt";
-        journal_file.open(journal_file_name);
-        if (!journal_file) {
+        auto host = Host::find(Job::find(m->job_id)->hostid);
+        if (!host){
             exit(2);
         }
-        journal_file << "\n";
+        Job::remove(m->job_id);
+        journal_file_name = journal_file_dir + host->getName() + ".txt";
+        journal_file.open(journal_file_name);
+        journal_file << host->getCurrentJobs().size();;
         journal_file.flush();
         journal_file.close();
-        Job::remove(m->job_id);
         break;
     }
     case M_MON_JOB_BEGIN: {
         auto *m = dynamic_cast<MonJobBeginMsg*>(msg.get());
         Job::createRemote(m->job_id, m->hostid);
         auto host = Host::find(m->hostid);
-        journal_file_name = journal_file_dir + "BEGIN%" + std::to_string(m->job_id) + "%" + host->getName() + ".txt";
-        journal_file.open(journal_file_name);
-        if (!journal_file) {
+        if (!host) {
             exit(3);
         }
-        journal_file << "\n";
+        journal_file_name = journal_file_dir + host->getName() + ".txt";
+        journal_file.open(journal_file_name);
+        journal_file << host->getCurrentJobs().size();
         journal_file.flush();
         journal_file.close();
         break;
     }
     case M_MON_JOB_DONE: {
         auto *m = dynamic_cast<MonJobDoneMsg*>(msg.get());
-        journal_file_name = journal_file_dir + "DONE%" + std::to_string(m->job_id) + ".txt";
-        journal_file.open(journal_file_name);
-        if (!journal_file) {
+        auto host = Host::find(Job::find(m->job_id)->hostid);
+        if (!host) {
             exit(4);
         }
-        journal_file << "\n";
+        Job::remove(m->job_id);
+        journal_file_name = journal_file_dir + host->getName() + ".txt";
+        journal_file.open(journal_file_name);
+        journal_file << host->getCurrentJobs().size();
         journal_file.flush();
         journal_file.close();
-        Job::remove(m->job_id);
         break;
     }
     case M_MON_GET_CS: {

@@ -1,5 +1,4 @@
 import os
-import glob
 import time
 from datetime import datetime
 
@@ -24,9 +23,6 @@ class HostStatus(Document):
 class JobsList:
     def __init__(self):
         self.jobs_per_host = {}
-        self.host_per_job = {}
-        self.total_created = 0
-        self.total_done = 0
         self.need_update = False
 
     def update_elastic(self, host_id):
@@ -44,43 +40,10 @@ class JobsList:
             for host in tmp_hosts:
                 self.update_elastic(host)
 
-    def print_status(self):
-        tmp_status = self.jobs_per_host.copy()
-        for host in tmp_status:
-            print(f'{host}: {tmp_status[host]}')
-        print(f'TOTAL CREATED: {self.total_created}')
-        print(f'TOTAL DONE:    {self.total_done}')
-
-    def insert_job(self, job_id, host_id):
-        if host_id not in self.jobs_per_host.keys():
-            self.jobs_per_host[host_id] = 0
-        self.jobs_per_host[host_id] += 1
-        self.host_per_job[job_id] = host_id
-        self.total_created += 1
-        self.need_update = True
-
-    def remove_job(self, job_id):
-        if job_id in self.host_per_job.keys():
-            host_id = self.host_per_job.pop(job_id)
-            self.jobs_per_host[host_id] = max(self.jobs_per_host[host_id] - 1, 0)
-            self.total_done += 1
+    def update(self, host_name, num_jobs):
+        if host_name not in self.jobs_per_host.keys() or self.jobs_per_host[host_name] != num_jobs:
             self.need_update = True
-        else:
-            print("JOB NOT FOUND!", job_id)
-
-
-def job_begin(filename, jobs_list):
-    print("job created")
-    os.remove(filename)
-    job_id, host_id = filename.replace('.txt', '').split('%')[1], filename.replace('.txt', '').split('%')[2]
-    jobs_list.insert_job(job_id, host_id)
-
-
-def job_done(filename, jobs_list):
-    print("job done")
-    os.remove(filename)
-    job_id = filename.replace('.txt', '').split('%')[1]
-    jobs_list.remove_job(job_id)
+        self.jobs_per_host[host_name] = num_jobs
 
 
 def main():
@@ -91,17 +54,14 @@ def main():
     try:
         while True:
             jobs_list.need_update = False
-            time.sleep(10)
-            begin_logs = list(filter(os.path.isfile, glob.glob(path + "BEGIN*")))
-            begin_logs.sort(key=lambda x: os.path.getmtime(x))
-            for log in begin_logs:
-                job_begin(log, jobs_list)
-            end_logs = list(filter(os.path.isfile, glob.glob(path + "DONE*")))
-            end_logs.sort(key=lambda x: os.path.getmtime(x))
-            for log in end_logs:
-                job_done(log, jobs_list)
+            for log in os.listdir(path):
+                host_name = log.replace('.txt', '')
+                full_filepath = os.path.join(path, log)
+                with open(full_filepath, 'r') as f:
+                    num_jobs = int(f.read())
+                jobs_list.update(host_name, num_jobs)
             jobs_list.update_all()
-            jobs_list.print_status()
+            time.sleep(10)
     except KeyboardInterrupt:
         pass
 
