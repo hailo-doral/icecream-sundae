@@ -62,7 +62,7 @@ def main():
                 host_name = log.replace('.txt', '')
                 full_filepath = os.path.join(path, log)
                 with open(full_filepath, 'r') as f:
-                    num_jobs = int(f.read().replace('/n', 0))
+                    num_jobs = int(f.read().replace('/n', ''))
                 jobs_list.update(host_name, num_jobs)
             jobs_list.update_all()
             time.sleep(10)
