@@ -51,7 +51,7 @@ class JobsList:
 
 
 def main():
-    path = "../builddir/.logs/"
+    path = ".logs/"
     if not os.path.isdir(path):
         os.mkdir(path)
     jobs_list = JobsList()
