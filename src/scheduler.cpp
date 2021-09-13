@@ -134,7 +134,9 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
     switch (msg->type) {
     case M_MON_LOCAL_JOB_BEGIN: {
         auto *m = dynamic_cast<MonLocalJobBeginMsg*>(msg.get());
-        journal_file_name = journal_file_dir + "BEGIN%" + std::to_string(m->job_id) + "%" + std::to_string(m->hostid) + ".txt";
+        Job::createLocal(m->job_id, m->hostid, m->file);
+        auto host = Host::find(m->hostid);
+        journal_file_name = journal_file_dir + "BEGIN%" + std::to_string(m->job_id) + "%" + host->getName() + ".txt";
         journal_file.open(journal_file_name);
         if (!journal_file) {
             exit(1);
@@ -142,7 +144,6 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
         journal_file << "\n";
         journal_file.flush();
         journal_file.close();
-        Job::createLocal(m->job_id, m->hostid, m->file);
         break;
     }
     case M_JOB_LOCAL_DONE: {
@@ -160,7 +161,9 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
     }
     case M_MON_JOB_BEGIN: {
         auto *m = dynamic_cast<MonJobBeginMsg*>(msg.get());
-        journal_file_name = journal_file_dir + "BEGIN%" + std::to_string(m->job_id) + "%" + std::to_string(m->hostid) + ".txt";
+        Job::createRemote(m->job_id, m->hostid);
+        auto host = Host::find(m->hostid);
+        journal_file_name = journal_file_dir + "BEGIN%" + std::to_string(m->job_id) + "%" + host->getName() + ".txt";
         journal_file.open(journal_file_name);
         if (!journal_file) {
             exit(3);
@@ -168,7 +171,6 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
         journal_file << "\n";
         journal_file.flush();
         journal_file.close();
-        Job::createRemote(m->job_id, m->hostid);
         break;
     }
     case M_MON_JOB_DONE: {
