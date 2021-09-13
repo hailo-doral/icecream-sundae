@@ -136,27 +136,21 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
         auto *m = dynamic_cast<MonLocalJobBeginMsg*>(msg.get());
         Job::createLocal(m->job_id, m->hostid, m->file);
         auto host = Host::find(m->hostid);
-        if (!host) {
-            exit(1);
-        }
         journal_file_name = journal_file_dir + host->getName() + ".txt";
         journal_file.open(journal_file_name);
         journal_file << host->getCurrentJobs().size();
-        journal_file.flush();
+        //journal_file.flush();
         journal_file.close();
         break;
     }
     case M_JOB_LOCAL_DONE: {
         auto *m = dynamic_cast<JobLocalDoneMsg*>(msg.get());
         auto host = Host::find(Job::find(m->job_id)->hostid);
-        if (!host){
-            exit(2);
-        }
         Job::remove(m->job_id);
         journal_file_name = journal_file_dir + host->getName() + ".txt";
         journal_file.open(journal_file_name);
         journal_file << host->getCurrentJobs().size();
-        journal_file.flush();
+        //journal_file.flush();
         journal_file.close();
         break;
     }
@@ -164,27 +158,21 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
         auto *m = dynamic_cast<MonJobBeginMsg*>(msg.get());
         Job::createRemote(m->job_id, m->hostid);
         auto host = Host::find(m->hostid);
-        if (!host) {
-            exit(3);
-        }
         journal_file_name = journal_file_dir + host->getName() + ".txt";
         journal_file.open(journal_file_name);
         journal_file << host->getCurrentJobs().size();
-        journal_file.flush();
+        //journal_file.flush();
         journal_file.close();
         break;
     }
     case M_MON_JOB_DONE: {
         auto *m = dynamic_cast<MonJobDoneMsg*>(msg.get());
         auto host = Host::find(Job::find(m->job_id)->hostid);
-        if (!host) {
-            exit(4);
-        }
         Job::remove(m->job_id);
         journal_file_name = journal_file_dir + host->getName() + ".txt";
         journal_file.open(journal_file_name);
         journal_file << host->getCurrentJobs().size();
-        journal_file.flush();
+        //journal_file.flush();
         journal_file.close();
         break;
     }
