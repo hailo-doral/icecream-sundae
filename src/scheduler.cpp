@@ -155,7 +155,7 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
         Job::remove(m->job_id);
         journal_file_name = journal_file_dir + host->getName() + ".txt";
         journal_file.open(journal_file_name);
-        journal_file << host->getCurrentJobs().size();;
+        journal_file << host->getCurrentJobs().size();
         journal_file.flush();
         journal_file.close();
         break;
