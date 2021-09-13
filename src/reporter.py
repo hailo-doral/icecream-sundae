@@ -23,27 +23,31 @@ class HostStatus(Document):
 class JobsList:
     def __init__(self):
         self.jobs_per_host = {}
-        self.need_update = False
+        self.need_update = {}
 
     def update_elastic(self, host_id):
-        connections.create_connection(hosts=ELASTIC_ADDRESS)
-        current_status = HostStatus(
-            host=host_id,
-            time=datetime.now(),
-            jobs=self.jobs_per_host[host_id]
-        )
-        current_status.save()
+        if self.need_update[host_id]:
+            connections.create_connection(hosts=ELASTIC_ADDRESS)
+            current_status = HostStatus(
+                host=host_id,
+                time=datetime.now(),
+                jobs=self.jobs_per_host[host_id]
+            )
+            current_status.save()
 
     def update_all(self):
-        if self.need_update:
-            tmp_hosts = list(self.jobs_per_host.keys())
-            for host in tmp_hosts:
-                self.update_elastic(host)
+        tmp_hosts = list(self.jobs_per_host.keys())
+        for host in tmp_hosts:
+            self.update_elastic(host)
 
     def update(self, host_name, num_jobs):
         if host_name not in self.jobs_per_host.keys() or self.jobs_per_host[host_name] != num_jobs:
-            self.need_update = True
+            self.need_update[host_name] = True
         self.jobs_per_host[host_name] = num_jobs
+
+    def cancel_update(self):
+        for host in self.need_update.keys():
+            self.need_updae[host] = False
 
 
 def main():
@@ -53,7 +57,7 @@ def main():
     jobs_list = JobsList()
     try:
         while True:
-            jobs_list.need_update = False
+            jobs_list.cancel_update()
             for log in os.listdir(path):
                 host_name = log.replace('.txt', '')
                 full_filepath = os.path.join(path, log)
