@@ -47,7 +47,7 @@ class JobsList:
 
     def cancel_update(self):
         for host in self.need_update.keys():
-            self.need_updae[host] = False
+            self.need_update[host] = False
 
 
 def main():
