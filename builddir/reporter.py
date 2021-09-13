@@ -41,7 +41,7 @@ class JobsList:
             self.update_elastic(host)
 
     def update(self, host_name, num_jobs):
-        if host_name not in self.jobs_per_host.keys() or self.jobs_per_host[host_name] != num_jobs:
+        if host_name not in self.jobs_per_host.keys() or self.jobs_per_host[host_name] != num_jobs or num_jobs != 0:
             self.need_update[host_name] = True
         self.jobs_per_host[host_name] = num_jobs
 
