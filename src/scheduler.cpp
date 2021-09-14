@@ -136,20 +136,7 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
         auto *m = dynamic_cast<MonLocalJobBeginMsg*>(msg.get());
         Job::createLocal(m->job_id, m->hostid, m->file);
         auto host = Host::find(m->hostid);
-        journal_file_name = journal_file_dir + host->getName() + ".txt";
-        Job::Map current_jobs = host->getCurrentJobs();
-        journal_file.open(journal_file_name);
-        journal_file << current_jobs.size();
-        journal_file.flush();
-        journal_file.close();
-        break;
-    }
-    case M_JOB_LOCAL_DONE: {
-        auto *m = dynamic_cast<JobLocalDoneMsg*>(msg.get());
-        auto job = Job::find(m->job_id);
-        Job::remove(m->job_id);
-        if (job) {
-            auto host = Host::find(job->hostid);
+        if (host) {
             journal_file_name = journal_file_dir + host->getName() + ".txt";
             Job::Map current_jobs = host->getCurrentJobs();
             journal_file.open(journal_file_name);
@@ -159,16 +146,35 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
         }
         break;
     }
+    case M_JOB_LOCAL_DONE: {
+        auto *m = dynamic_cast<JobLocalDoneMsg*>(msg.get());
+        auto job = Job::find(m->job_id);
+        Job::remove(m->job_id);
+        if (job) {
+            auto host = Host::find(job->hostid);
+            if (host) {
+                journal_file_name = journal_file_dir + host->getName() + ".txt";
+                Job::Map current_jobs = host->getCurrentJobs();
+                journal_file.open(journal_file_name);
+                journal_file << current_jobs.size();
+                journal_file.flush();
+                journal_file.close();    
+            }
+        }
+        break;
+    }
     case M_MON_JOB_BEGIN: {
         auto *m = dynamic_cast<MonJobBeginMsg*>(msg.get());
         Job::createRemote(m->job_id, m->hostid);
         auto host = Host::find(m->hostid);
-        journal_file_name = journal_file_dir + host->getName() + ".txt";
-        Job::Map current_jobs = host->getCurrentJobs();
-        journal_file.open(journal_file_name);
-        journal_file << current_jobs.size();
-        journal_file.flush();
-        journal_file.close();
+        if (host) {
+            journal_file_name = journal_file_dir + host->getName() + ".txt";
+            Job::Map current_jobs = host->getCurrentJobs();
+            journal_file.open(journal_file_name);
+            journal_file << current_jobs.size();
+            journal_file.flush();
+            journal_file.close();
+        }
         break;
     }
     case M_MON_JOB_DONE: {
@@ -177,12 +183,14 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
         Job::remove(m->job_id);
         if (job) {
             auto host = Host::find(job->hostid);
-            journal_file_name = journal_file_dir + host->getName() + ".txt";
-            Job::Map current_jobs = host->getCurrentJobs();
-            journal_file.open(journal_file_name);
-            journal_file << current_jobs.size();
-            journal_file.flush();
-            journal_file.close();
+            if (host) {
+                journal_file_name = journal_file_dir + host->getName() + ".txt";
+                Job::Map current_jobs = host->getCurrentJobs();
+                journal_file.open(journal_file_name);
+                journal_file << current_jobs.size();
+                journal_file.flush();
+                journal_file.close();
+            }
         }
         break;
     }
